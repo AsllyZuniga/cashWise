@@ -1,5 +1,5 @@
-import { HEADER_CARDS } from './header.constants';
-import { UiCard, UiButton } from '../../webComponents';
+import { HEADER_CARDS } from "./header.constants";
+import { UiCard, UiButton } from "../../webComponents";
 
 export default function HeaderCards() {
   return (
@@ -9,16 +9,13 @@ export default function HeaderCards() {
           <div className="card-content">
             <img src={card.image} alt={card.title} className="card-image" />
             <div className="card-text">
-              <h3>{card.title}</h3>
-              <p>{card.value}</p>
+              <h3>
+                {card.title}: {card.value}
+              </h3>
             </div>
           </div>
 
-          {index === 0 && (
-            <div slot="footer">
-              <UiButton>Agregar</UiButton>
-            </div>
-          )}
+          {index === 0 && <UiButton className="btn-agregar">Agregar</UiButton>}
         </UiCard>
       ))}
     </>
