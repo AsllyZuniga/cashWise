@@ -1,49 +1,37 @@
 .header {
+  background-color: #111;
   display: flex;
   flex-direction: column;
-  padding: 0;
-  margin: 5px 0 0 3px;
+  padding: 1.5rem 3rem 4rem;
   box-sizing: border-box;
   width: 100%;
 
   &__container {
-    background-color: white;
-    border: 2px solid orange;
     box-sizing: border-box;
-    border-radius: 4px;
     width: 100%;
-    padding: 24px 12px 0px 10px;
   }
 
   &__top {
-    background-color: #111;
-    padding: 4rem;
     display: flex;
     align-items: center;
-    gap: 1px;
-    margin-bottom: 4rem;
   }
 
   &__title {
     color: white;
     font-size: 1.5rem;
     font-weight: bold;
-    margin: -39px 2px 30px -28px;
   }
 
   &__select {
-    margin-left: 1rem;
-    margin-top: -4rem;
-
+    margin-left: 5px;
+    transform: translateY(4px);
   }
 
   &__cards {
     display: flex;
     gap: 1.5rem;
-    margin-top: -3.0rem;
-    padding: 25px 37px;
+    margin-top: 15px;
     position: absolute;
-    top: 120px;
 
     ui-card {
       width: 300px;
@@ -54,17 +42,20 @@
     }
   }
 }
+
+.card-content-elements {
+  text-align: left;
+}
+
 .btn-agregar {
-  margin-top: -34px;
-  margin-left: 65px;
+  margin-top: 5px;
+  margin-left: 5px;
   display: block;
 }
 
 .card-content {
   display: flex;
-  align-items: center;
   gap: 1rem;
-  padding: 0.5rem;
 }
 
 .card-image {
@@ -74,13 +65,7 @@
   flex-shrink: 0;
 }
 
-.card-text {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.card-text h3 {
+h3 {
   font-size: 1rem;
   margin: 0;
 }

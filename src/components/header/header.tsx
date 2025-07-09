@@ -1,6 +1,7 @@
 import "./header.scss";
 import { UiSelect } from "../../webComponents";
 import HeaderCards from "./headerCards";
+import { YEARS_OPTIONS } from "./header.constants";
 
 export default function Header() {
   return (
@@ -8,10 +9,8 @@ export default function Header() {
       <div className="header__container">
         <div className="header__top">
           <h1 className="header__title">Mis finanzas personales</h1>
-
-          <UiSelect className="header__select" />
+          <UiSelect className="header__select" options={YEARS_OPTIONS}/>
         </div>
-
         <div className="header__cards">
           <HeaderCards />
         </div>
