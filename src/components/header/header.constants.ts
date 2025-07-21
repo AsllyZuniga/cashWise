@@ -1,16 +1,16 @@
 export const HEADER_CARDS = [
   {
-    image: "/img/img1.png",
+    image: "/src/assets/img/img1.png",
     title: "Puedes gastar",
     value: "$0",
   },
   {
-    image: "/img/img2.jpeg",
+    image: "/src/assets/img/img2.png",
     title: "Gasto total",
     value: "$0",
   },
   {
-    image: "/img/img3.jpeg",
+    image: "/src/assets/img/img3.png",
     title: "Vas ahorrando",
     value: "$0",
   },
