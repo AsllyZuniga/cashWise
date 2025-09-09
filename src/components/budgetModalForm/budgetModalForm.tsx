@@ -46,10 +46,7 @@ export default function BudgetModalForm({
             name="value"
             inputId="value"
             value={form.value}
-            onValueChange={(e) =>
-                         
-              handleChange(e.detail.name, e.detail.value)
-            }
+            onValueChange={(e) => handleChange(e.detail.name, e.detail.value)}
           />
         </div>
 
@@ -62,10 +59,7 @@ export default function BudgetModalForm({
             name="date"
             inputId="date"
             value={form.date}
-         onValueChange={(e) =>
-            console.log(typeof e)
-             /*  handleChange(e.detail.name, e.detail.value)  */
-            }
+            onValueChange={(e) => handleChange(e.detail.name, e.detail.value)}
           />
         </div>
       </div>
