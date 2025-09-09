@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { UiPanelModal, UiInput, UiButton } from "../../webComponents";
 
+interface FormState {
+  value: string;
+  date: string;
+}
+
 export default function BudgetModalForm({
   isOpen,
   onClose,
@@ -8,11 +13,20 @@ export default function BudgetModalForm({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  const [value, setValue] = useState("");
-  const [date, setDate] = useState("");
+  const [form, setForm] = useState<FormState>({
+    value: "",
+    date: "",
+  });
+
+  const handleChange = (field: keyof FormState, newValue: string) => {
+    setForm((prev) => ({
+      ...prev,
+      [field]: newValue,
+    }));
+  };
 
   const handleSave = () => {
-    console.log("Presupuesto guardado:", { value, date });
+    console.log("Presupuesto guardado:", form);
     onClose();
   };
 
@@ -24,25 +38,39 @@ export default function BudgetModalForm({
 
       <div className="modal-body space-y-4">
         <div>
-          <label className="block mb-1 font-medium">Valor</label>
+          <label htmlFor="value" className="block mb-1 font-medium">
+            Valor
+          </label>
           <UiInput
             type="number"
-            value={value}
-            onInput={(e: any) => setValue(e.target.value)}
+            name="value"
+            inputId="value"
+            value={form.value}
+            onValueChange={(e) =>
+                         
+              handleChange(e.detail.name, e.detail.value)
+            }
           />
         </div>
 
         <div>
-          <label className="block mb-1 font-medium">Fecha</label>
+          <label htmlFor="date" className="block mb-1 font-medium">
+            Fecha
+          </label>
           <UiInput
             type="date"
-            value={date}
-            onInput={(e: any) => setDate(e.target.value)}
+            name="date"
+            inputId="date"
+            value={form.date}
+         onValueChange={(e) =>
+            console.log(typeof e)
+             /*  handleChange(e.detail.name, e.detail.value)  */
+            }
           />
         </div>
       </div>
 
-      <div className="modal-footer">
+      <div className="modal-footer flex gap-2 justify-end">
         <UiButton className="cancel" onClick={onClose}>
           Cancelar
         </UiButton>
