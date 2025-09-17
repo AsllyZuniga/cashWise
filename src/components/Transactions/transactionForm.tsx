@@ -1,6 +1,15 @@
 import { useState, useEffect } from "react";
-import { UiPanelModal, UiInput, UiButton } from "../../webComponents";
+import { UiPanelModal, UiInput, UiButton, UiSelect } from "../../webComponents";
 import "./Transaction.scss";
+
+interface FormState {
+  concept: string;
+  movement: string;
+  amount: string;
+  paymentMethod: string;
+  relation: string;
+  date: string;
+}
 
 export default function TransactionForm({
   isOpen,
@@ -9,42 +18,60 @@ export default function TransactionForm({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  const [concept, setConcept] = useState("");
-  const [movement, setMovement] = useState("");
-  const [amount, setAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("");
-  const [relation, setRelation] = useState("");
-  const [date, setDate] = useState("");
+  const [form, setForm] = useState<FormState>({
+    concept: "",
+    movement: "",
+    amount: "",
+    paymentMethod: "",
+    relation: "",
+    date: "",
+  });
+
+  const handleChange = (field: keyof FormState, newValue: string) => {
+    setForm((prev) => ({
+      ...prev,
+      [field]: newValue,
+    }));
+  };
+
+  // Manejador específico para UiSelect que usa el evento personalizado
+  const handleSelectChange = (field: keyof FormState) => (e: any) => {
+    console.log(`Cambio en ${field}:`, e.detail);
+    handleChange(field, String(e.detail.value));
+  };
+
+  // Manejador específico para UiInput que usa el evento personalizado
+  const handleInputChange = (field: keyof FormState) => (e: any) => {
+    console.log(`Cambio en ${field}:`, e.detail);
+    handleChange(field, e.detail.value);
+  };
 
   // 🧹 limpiar campos cada vez que se abre el modal
   useEffect(() => {
     if (isOpen) {
-      setConcept("");
-      setMovement("");
-      setAmount("");
-      setPaymentMethod("");
-      setRelation("");
-      setDate("");
+      setForm({
+        concept: "",
+        movement: "",
+        amount: "",
+        paymentMethod: "",
+        relation: "",
+        date: "",
+      });
     }
   }, [isOpen]);
 
   const handleSave = () => {
-    console.log("Nueva transacción:", {
-      concept,
-      movement,
-      amount,
-      paymentMethod,
-      relation,
-      date,
-    });
+    console.log("Nueva transacción:", form);
 
     // 🧹 limpiar al guardar
-    setConcept("");
-    setMovement("");
-    setAmount("");
-    setPaymentMethod("");
-    setRelation("");
-    setDate("");
+    setForm({
+      concept: "",
+      movement: "",
+      amount: "",
+      paymentMethod: "",
+      relation: "",
+      date: "",
+    });
 
     onClose();
   };
@@ -55,81 +82,93 @@ export default function TransactionForm({
         <h2>Nueva transacción</h2>
       </div>
 
-      <div className="modal-body transaction-form">
-        <div className="form-group">
-          <label>Concepto</label>
+      <div className="modal-body transaction-form space-y-4">
+        {/* Concepto */}
+        <div>
+          <label htmlFor="concept" className="block mb-1 font-medium">
+            Concepto
+          </label>
           <UiInput
             type="text"
-            value={concept}
-            onInput={(e: any) => setConcept(e.target.value)}
+            name="concept"
+            inputId="concept"
+            value={form.concept}
+            onValueChange={handleInputChange("concept")}
           />
         </div>
 
-        <div className="form-group">
-          <label>Movimiento</label>
-          <select
-            className="custom-select"
-            value={movement}
-            onChange={(e) => setMovement(e.target.value)}
-          >
-            <option value="">Seleccione</option>
-            <option value="pago">Pago</option>
-            <option value="gasto">Gasto</option>
-            <option value="inversion">Inversión</option>
-            <option value="ingreso">Ingreso</option>
-          </select>
-        </div>
+        {/* Movimiento con UiSelect */}
+        <UiSelect
+          name="movement"
+          label="Movimiento"
+          options={[
+            { id: "1", value: "pago", label: "Pago" },
+            { id: "2", value: "gasto", label: "Gasto" },
+            { id: "3", value: "inversion", label: "Inversión" },
+            { id: "4", value: "ingreso", label: "Ingreso" },
+          ]}
+          value={form.movement}
+          onValueChange={handleSelectChange("movement")}
+        />
 
-        <div className="form-group">
-          <label>Valor</label>
+        {/* Valor */}
+        <div>
+          <label htmlFor="amount" className="block mb-1 font-medium">
+            Valor
+          </label>
           <UiInput
             type="number"
-            value={amount}
-            onInput={(e: any) => setAmount(e.target.value)}
+            name="amount"
+            inputId="amount"
+            value={form.amount}
+            onValueChange={handleInputChange("amount")}
           />
         </div>
 
-        <div className="form-group">
-          <label>Método de pago</label>
-          <select
-            className="custom-select"
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value)}
-          >
-            <option value="">Seleccione</option>
-            <option value="efectivo">Efectivo</option>
-            <option value="tarjeta">Tarjeta de crédito</option>
-            <option value="transferencia">Transferencia</option>
-            <option value="otro">Otro</option>
-          </select>
-        </div>
+        {/* Método de pago con UiSelect */}
+        <UiSelect
+          name="paymentMethod"
+          label="Método de pago"
+          options={[
+            { id: "1", value: "efectivo", label: "Efectivo" },
+            { id: "2", value: "tarjeta", label: "Tarjeta de crédito" },
+            { id: "3", value: "transferencia", label: "Transferencia" },
+            { id: "4", value: "otro", label: "Otro" },
+          ]}
+          value={form.paymentMethod}
+          onValueChange={handleSelectChange("paymentMethod")}
+        />
 
-        <div className="form-group">
-          <label>Relación</label>
-          <select
-            className="custom-select"
-            value={relation}
-            onChange={(e) => setRelation(e.target.value)}
-          >
-            <option value="">Seleccione</option>
-            <option value="esenciales">Esenciales</option>
-            <option value="bienestar">Bienestar</option>
-            <option value="placer">Placer</option>
-            <option value="aporte">Aporte</option>
-          </select>
-        </div>
+        {/* Relación con UiSelect */}
+        <UiSelect
+          name="relation"
+          label="Relación"
+          options={[
+            { id: "1", value: "esenciales", label: "Esenciales" },
+            { id: "2", value: "bienestar", label: "Bienestar" },
+            { id: "3", value: "placer", label: "Placer" },
+            { id: "4", value: "aporte", label: "Aporte" },
+          ]}
+          value={form.relation}
+          onValueChange={handleSelectChange("relation")}
+        />
 
-        <div className="form-group">
-          <label>Fecha</label>
+        {/* Fecha */}
+        <div>
+          <label htmlFor="date" className="block mb-1 font-medium">
+            Fecha
+          </label>
           <UiInput
             type="date"
-            value={date}
-            onInput={(e: any) => setDate(e.target.value)}
+            name="date"
+            inputId="date"
+            value={form.date}
+            onValueChange={handleInputChange("date")}
           />
         </div>
       </div>
 
-      <div className="modal-footer">
+      <div className="modal-footer flex gap-2 justify-end">
         <UiButton className="cancel" onClick={onClose}>
           Cancelar
         </UiButton>
