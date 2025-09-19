@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { UiPanelModal, UiInput, UiButton, UiSelect } from "../../webComponents";
+import { useState } from "react";
+import { UiPanelModal, UiInput, UiButton, UiSelect, UiTable } from "../../webComponents";
 import "./Transaction.scss";
 
 interface FormState {
@@ -11,12 +11,53 @@ interface FormState {
   date: string;
 }
 
-export default function TransactionForm({
+export default function TransactionManager() {
+  const [transactions, setTransactions] = useState<FormState[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
+
+  const addTransaction = (transaction: FormState) => {
+    setTransactions((prev) => [...prev, transaction]);
+  };
+
+  return (
+    <div className="transaction-manager space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-bold">Movimientos</h2>
+        {/* Botón principal para abrir modal */}
+        <UiButton onClick={() => setIsOpen(true)}>+ Nueva transacción</UiButton>
+      </div>
+
+      {/* Tabla de movimientos */}
+      <UiTable
+        headers={[
+          { field: "date", label: "Fecha de ingreso" },
+          { field: "concept", label: "Descripción" },
+          { field: "movement", label: "Movimiento" },
+          { field: "amount", label: "Valor" },
+          { field: "paymentMethod", label: "Método de pago" },
+          { field: "relation", label: "Relación" },
+        ]}
+        data={transactions}
+      />
+
+      {/* Modal con formulario */}
+      <TransactionForm
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        onSave={addTransaction}
+      />
+    </div>
+  );
+}
+
+function TransactionForm({
   isOpen,
   onClose,
+  onSave,
 }: {
   isOpen: boolean;
   onClose: () => void;
+  onSave: (transaction: FormState) => void;
 }) {
   const [form, setForm] = useState<FormState>({
     concept: "",
@@ -27,43 +68,20 @@ export default function TransactionForm({
     date: "",
   });
 
-  const handleChange = (field: keyof FormState, newValue: string) => {
-    setForm((prev) => ({
-      ...prev,
-      [field]: newValue,
-    }));
+  const handleChange = (field: keyof FormState, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Manejador específico para UiSelect que usa el evento personalizado
   const handleSelectChange = (field: keyof FormState) => (e: any) => {
-    console.log(`Cambio en ${field}:`, e.detail);
     handleChange(field, String(e.detail.value));
   };
 
-  // Manejador específico para UiInput que usa el evento personalizado
   const handleInputChange = (field: keyof FormState) => (e: any) => {
-    console.log(`Cambio en ${field}:`, e.detail);
     handleChange(field, e.detail.value);
   };
 
-  // 🧹 limpiar campos cada vez que se abre el modal
-  useEffect(() => {
-    if (isOpen) {
-      setForm({
-        concept: "",
-        movement: "",
-        amount: "",
-        paymentMethod: "",
-        relation: "",
-        date: "",
-      });
-    }
-  }, [isOpen]);
-
   const handleSave = () => {
-    console.log("Nueva transacción:", form);
-
-    // 🧹 limpiar al guardar
+    onSave(form);
     setForm({
       concept: "",
       movement: "",
@@ -72,7 +90,6 @@ export default function TransactionForm({
       relation: "",
       date: "",
     });
-
     onClose();
   };
 
@@ -83,7 +100,6 @@ export default function TransactionForm({
       </div>
 
       <div className="modal-body transaction-form space-y-4">
-        {/* Concepto */}
         <div>
           <label htmlFor="concept" className="block mb-1 font-medium">
             Concepto
@@ -97,7 +113,6 @@ export default function TransactionForm({
           />
         </div>
 
-        {/* Movimiento con UiSelect */}
         <UiSelect
           name="movement"
           label="Movimiento"
@@ -111,7 +126,6 @@ export default function TransactionForm({
           onValueChange={handleSelectChange("movement")}
         />
 
-        {/* Valor */}
         <div>
           <label htmlFor="amount" className="block mb-1 font-medium">
             Valor
@@ -125,7 +139,6 @@ export default function TransactionForm({
           />
         </div>
 
-        {/* Método de pago con UiSelect */}
         <UiSelect
           name="paymentMethod"
           label="Método de pago"
@@ -139,7 +152,6 @@ export default function TransactionForm({
           onValueChange={handleSelectChange("paymentMethod")}
         />
 
-        {/* Relación con UiSelect */}
         <UiSelect
           name="relation"
           label="Relación"
@@ -153,7 +165,6 @@ export default function TransactionForm({
           onValueChange={handleSelectChange("relation")}
         />
 
-        {/* Fecha */}
         <div>
           <label htmlFor="date" className="block mb-1 font-medium">
             Fecha
