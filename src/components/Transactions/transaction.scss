@@ -1,3 +1,22 @@
+/* --- Alinear botón "Nueva Transacción" completamente a la derecha --- */
+.transaction-header {
+  display: flex;
+  justify-content: flex-end; /* Empuja el botón al extremo derecho */
+}
+
+/* --- Estilos visuales del botón --- */
+.new-transaction-button {
+  
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.new-transaction-button:hover {
+ 
+}
 .transaction-form {
   display: flex;
   flex-direction: column;
@@ -35,5 +54,52 @@
   margin-top: 1rem;
 }
 
+/* --- Estilos añadidos para los botones dentro de la tabla --- */
+.transaction-manager {
+  padding: 10px 0;
+}
 
-            
+/* margen izquierdo para el título "Movimientos" */
+.transaction-manager h2 {
+  margin-left: 40px;
+  margin-bottom: 5px;
+  font-weight: 700;
+}
+
+.ui-table td button {
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin: 0 3px;
+}
+
+.ui-table td button:hover {
+  background-color: hsl(224, 5%, 47%);
+}
+
+.ui-table td button.delete {
+  background-color: #766c6c;
+}
+
+.ui-table td button.delete:hover {
+  background-color: #991b1b;
+}
+
+/* Espacio uniforme en columna de acciones */
+.ui-table td:last-child {
+  white-space: nowrap;
+}
+
+/* Estilo para tabla vacía */
+.ui-table-empty-message {
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  padding: 1rem;
+}
+
