@@ -1,5 +1,5 @@
 import "./header.scss";
-import { UiSelect } from "../../webComponents";
+import { UiSelect } from "@asllyzuniga/react-library";
 import HeaderCards from "./headerCards";
 import { YEARS_OPTIONS } from "./header.constants";
 
