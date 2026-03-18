@@ -1,14 +1,27 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   UiPanelModal,
   UiInput,
   UiButton,
   UiSelect,
   UiTable,
-} from "../../webComponents";
+} from "@asllyzuniga/react-library";
 import "./Transaction.scss";
+import {
+  fetchTransactions,
+  fetchSaveTransaction,
+  fetchUpdateTransaction,
+  fetchDeleteTransaction,
+} from "../../services/transactions.service";
+import { Transaction } from "../../models/transactions.interface";
+
+interface TransactionFormProps {
+  externalOpen?: boolean;
+  onCloseExternal?: () => void;
+}
 
 interface FormState {
+  id?: string;
   concept: string;
   movement: string;
   amount: string;
@@ -17,12 +30,37 @@ interface FormState {
   date: string;
 }
 
-interface TransactionFormProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
+const MOVEMENTS = ["Pago", "Gasto", "Inversión", "Ingreso"];
+const METHODS = ["Efectivo", "Tarjeta de crédito", "Transferencia", "Otro"];
+const RELATIONS = ["Esenciales", "Bienestar", "Placer", "Aporte"];
 
-export default function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
+const toFormState = (tx: Transaction): FormState => ({
+  id: tx.id,
+  concept: tx.description || "",
+  movement: String(tx.movement),
+  amount: String(tx.value),
+  paymentMethod: String(tx.methodOfPayment),
+  relation: String(tx.relation),
+  date: tx.entryDate?.split("T")[0] || "",
+});
+
+const toTransaction = (form: FormState, includeId: boolean = false): Transaction => {
+  const tx: Transaction = {
+    value: Number(form.amount),
+    description: form.concept,
+    entryDate: form.date + "T00:00:00.000Z",
+    movement: Number(form.movement),
+    methodOfPayment: Number(form.paymentMethod),
+    relation: Number(form.relation),
+  };
+  if (includeId && form.id) tx.id = form.id;
+  return tx;
+};
+
+export default function TransactionForm({
+  externalOpen,
+  onCloseExternal,
+}: TransactionFormProps) {
   const [transactions, setTransactions] = useState<FormState[]>([]);
   const [form, setForm] = useState<FormState>({
     concept: "",
@@ -32,25 +70,118 @@ export default function TransactionForm({ isOpen, onClose }: TransactionFormProp
     relation: "",
     date: "",
   });
+  const [loading, setLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
 
-  const addTransaction = (transaction: FormState) => {
-    setTransactions((prev) => [...prev, transaction]);
+  useEffect(() => {
+    loadTransactions();
+  }, []);
+
+  useEffect(() => {
+    if (externalOpen) {
+      resetForm();
+      setEditIndex(null);
+      setModalOpen(true);
+    }
+  }, [externalOpen]);
+
+  const loadTransactions = async () => {
+    setLoading(true);
+    try {
+      const now = new Date();
+      const data = await fetchTransactions(now.getMonth() + 1, now.getFullYear());
+      setTransactions(data.map(toFormState));
+    } catch (error) {
+      console.error("Error cargando transacciones:", error);
+      alert("Error al cargar las transacciones.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleChange = (field: keyof FormState, value: string) => {
+  const handleSave = async () => {
+    if (!form.concept || !form.amount || !form.paymentMethod || !form.movement || !form.date) {
+      alert("Por favor completa todos los campos requeridos.");
+      return;
+    }
+
+    if (isNaN(Number(form.amount)) || Number(form.amount) <= 0) {
+      alert("El valor debe ser un número mayor a 0.");
+      return;
+    }
+
+    try {
+      if (editIndex !== null) {
+        const updatedTx = toTransaction(form, true);
+        const saved = await fetchUpdateTransaction(updatedTx);
+        setTransactions((prev) =>
+          prev.map((t, i) => (i === editIndex ? toFormState(saved) : t))
+        );
+        alert("Transacción actualizada exitosamente.");
+      } else {
+        const newTx = toTransaction(form, false);
+        const saved = await fetchSaveTransaction(newTx);
+        setTransactions((prev) => [...prev, toFormState(saved)]);
+        alert("Transacción creada exitosamente.");
+      }
+
+      await loadTransactions();
+      resetForm();
+      setModalOpen(false);
+      onCloseExternal?.();
+    } catch (error: any) {
+      console.error("Error guardando transacción:", error);
+      alert(`Error al guardar la transacción: ${error.message}`);
+    }
+  };
+
+  const handleEdit = (index: number) => {
+    const selected = transactions[index];
+    if (!selected) return;
+
+    setForm({
+      id: selected.id,
+      concept: selected.concept || "",
+      movement: String(selected.movement),
+      amount: String(selected.amount),
+      paymentMethod: String(selected.paymentMethod),
+      relation: String(selected.relation),
+      date: selected.date || "",
+    });
+
+    setEditIndex(index);
+    setModalOpen(true);
+  };
+
+  const handleDelete = async (index: number) => {
+    const tx = transactions[index];
+    if (!tx?.id) {
+      alert("No se encontró el ID de la transacción.");
+      return;
+    }
+
+    if (confirm(`¿Seguro que quieres eliminar "${tx.concept}"?`)) {
+      try {
+        await fetchDeleteTransaction(tx.id);
+        setTransactions((prev) => prev.filter((_, i) => i !== index));
+        alert("Transacción eliminada exitosamente.");
+      } catch (error: any) {
+        alert(`No se pudo eliminar: ${error.message}`);
+      }
+    }
+  };
+
+  const handleChange = (field: keyof FormState, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
-  };
 
-  const handleSelectChange = (field: keyof FormState) => (e: any) => {
+  const handleSelectChange = (field: keyof FormState) => (e: any) =>
     handleChange(field, String(e.detail.value));
-  };
 
-  const handleInputChange = (field: keyof FormState) => (e: any) => {
+  const handleInputChange = (field: keyof FormState) => (e: any) =>
     handleChange(field, e.detail.value);
-  };
 
-  const handleSave = () => {
-    addTransaction(form);
+  const resetForm = () => {
     setForm({
       concept: "",
       movement: "",
@@ -59,41 +190,72 @@ export default function TransactionForm({ isOpen, onClose }: TransactionFormProp
       relation: "",
       date: "",
     });
-    onClose();
+    setEditIndex(null);
   };
+
+  const tableData = transactions.map((tx, index) => ({
+    ...tx,
+    movement: MOVEMENTS[Number(tx.movement) - 1] || tx.movement,
+    paymentMethod: METHODS[Number(tx.paymentMethod) - 1] || tx.paymentMethod,
+    relation: RELATIONS[Number(tx.relation) - 1] || tx.relation,
+    _originalIndex: index,
+  }));
 
   return (
     <>
-      {/* Tabla con datos */}
       <div className="transaction-manager space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold">Movimientos</h2>
-        </div>
+        <h2 className="text-xl font-bold">Movimientos</h2>
 
-        <UiTable
-          headers={[
-            { field: "date", label: "Fecha de ingreso" },
-            { field: "concept", label: "Descripción" },
-            { field: "movement", label: "Movimiento" },
-            { field: "amount", label: "Valor" },
-            { field: "paymentMethod", label: "Método de pago" },
-            { field: "relation", label: "Relación" },
-          ]}
-          data={transactions}
-        />
+        {loading ? (
+          <p>Cargando transacciones...</p>
+        ) : (
+          <UiTable
+            headers={[
+              { field: "concept", label: "Concepto" },
+              { field: "movement", label: "Movimiento" },
+              { field: "amount", label: "Valor" },
+              { field: "paymentMethod", label: "Método de Pago" },
+              { field: "relation", label: "Relación" },
+              { field: "date", label: "Fecha" },
+              { field: "actions", label: "Acciones" },
+            ]}
+            data={tableData}
+            templates={{
+              actions: (_value: unknown, row: any) => {
+                const container = document.createElement("div");
+                container.style.display = "flex";
+                container.style.gap = "8px";
+                container.style.justifyContent = "center";
+
+               
+                const editBtn = document.createElement("ui-button");
+                editBtn.textContent = "Editar"; 
+                editBtn.setAttribute("variant", "primary");
+                editBtn.onclick = () => handleEdit(row._originalIndex);
+          
+                const deleteBtn = document.createElement("ui-button");
+                deleteBtn.textContent = "Eliminar";
+                deleteBtn.setAttribute("variant", "danger");
+                deleteBtn.onclick = () => handleDelete(row._originalIndex);
+
+                container.appendChild(editBtn);
+                container.appendChild(deleteBtn);
+                return container;
+              },
+            }}
+          />
+        )}
       </div>
 
-      {/* Modal con formulario */}
-      <UiPanelModal visible={isOpen}>
+      {/* ✅ MODAL sin placeholders y con labels externos */}
+      <UiPanelModal visible={modalOpen}>
         <div className="modal-header">
-          <h2>Nueva transacción</h2>
+          <h2>{editIndex !== null ? "Editar Transacción" : "Nueva Transacción"}</h2>
         </div>
 
-        <div className="modal-body transaction-form space-y-4">
-          <div>
-            <label htmlFor="concept" className="block mb-1 font-medium">
-              Concepto
-            </label>
+        <div className="modal-body transaction-form">
+          <div className="form-group">
+            <label htmlFor="concept">Concepto</label>
             <UiInput
               type="text"
               name="concept"
@@ -103,23 +265,22 @@ export default function TransactionForm({ isOpen, onClose }: TransactionFormProp
             />
           </div>
 
-          <UiSelect
-            name="movement"
-            label="Movimiento"
-            options={[
-              { id: "1", value: "pago", label: "Pago" },
-              { id: "2", value: "gasto", label: "Gasto" },
-              { id: "3", value: "inversion", label: "Inversión" },
-              { id: "4", value: "ingreso", label: "Ingreso" },
-            ]}
-            value={form.movement}
-            onValueChange={handleSelectChange("movement")}
-          />
+          <div className="form-group">
+            <label htmlFor="movement">Movimiento</label>
+            <UiSelect
+              name="movement"
+              options={MOVEMENTS.map((label, idx) => ({
+                id: String(idx + 1),
+                value: String(idx + 1),
+                label,
+              }))}
+              value={form.movement}
+              onValueChange={handleSelectChange("movement")}
+            />
+          </div>
 
-          <div>
-            <label htmlFor="amount" className="block mb-1 font-medium">
-              Valor
-            </label>
+          <div className="form-group">
+            <label htmlFor="amount">Valor</label>
             <UiInput
               type="number"
               name="amount"
@@ -129,36 +290,36 @@ export default function TransactionForm({ isOpen, onClose }: TransactionFormProp
             />
           </div>
 
-          <UiSelect
-            name="paymentMethod"
-            label="Método de pago"
-            options={[
-              { id: "1", value: "efectivo", label: "Efectivo" },
-              { id: "2", value: "tarjeta", label: "Tarjeta de crédito" },
-              { id: "3", value: "transferencia", label: "Transferencia" },
-              { id: "4", value: "otro", label: "Otro" },
-            ]}
-            value={form.paymentMethod}
-            onValueChange={handleSelectChange("paymentMethod")}
-          />
+          <div className="form-group">
+            <label htmlFor="paymentMethod">Método de Pago</label>
+            <UiSelect
+              name="paymentMethod"
+              options={METHODS.map((label, idx) => ({
+                id: String(idx + 1),
+                value: String(idx + 1),
+                label,
+              }))}
+              value={form.paymentMethod}
+              onValueChange={handleSelectChange("paymentMethod")}
+            />
+          </div>
 
-          <UiSelect
-            name="relation"
-            label="Relación"
-            options={[
-              { id: "1", value: "esenciales", label: "Esenciales" },
-              { id: "2", value: "bienestar", label: "Bienestar" },
-              { id: "3", value: "placer", label: "Placer" },
-              { id: "4", value: "aporte", label: "Aporte" },
-            ]}
-            value={form.relation}
-            onValueChange={handleSelectChange("relation")}
-          />
+          <div className="form-group">
+            <label htmlFor="relation">Relación</label>
+            <UiSelect
+              name="relation"
+              options={RELATIONS.map((label, idx) => ({
+                id: String(idx + 1),
+                value: String(idx + 1),
+                label,
+              }))}
+              value={form.relation}
+              onValueChange={handleSelectChange("relation")}
+            />
+          </div>
 
-          <div>
-            <label htmlFor="date" className="block mb-1 font-medium">
-              Fecha
-            </label>
+          <div className="form-group">
+            <label htmlFor="date">Fecha</label>
             <UiInput
               type="date"
               name="date"
@@ -169,12 +330,19 @@ export default function TransactionForm({ isOpen, onClose }: TransactionFormProp
           </div>
         </div>
 
-        <div className="modal-footer flex gap-2 justify-end">
-          <UiButton className="cancel" onClick={onClose}>
+        <div className="modal-footer">
+          <UiButton
+            className="cancel"
+            onClick={() => {
+              resetForm();
+              setModalOpen(false);
+              onCloseExternal?.();
+            }}
+          >
             Cancelar
           </UiButton>
           <UiButton className="save" onClick={handleSave}>
-            Guardar
+            {editIndex !== null ? "Actualizar" : "Guardar"}
           </UiButton>
         </div>
       </UiPanelModal>

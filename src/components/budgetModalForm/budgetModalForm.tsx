@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { UiPanelModal, UiInput, UiButton } from "../../webComponents";
+import { UiPanelModal, UiInput, UiButton } from "@asllyzuniga/react-library";
 
 interface FormState {
   value: string;
