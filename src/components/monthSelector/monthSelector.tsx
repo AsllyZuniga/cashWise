@@ -1,7 +1,7 @@
 import { useState } from "react";
 import "./monthselector.scss";
 import { MONTHS_OPTIONS } from "./monthSelector.constansts";
-import { UiButton } from "../../webComponents";
+import { UiButton } from "@asllyzuniga/react-library";
 
 export default function MonthSelector() {
   const [selectedMonth, setSelectedMonth] = useState("");
