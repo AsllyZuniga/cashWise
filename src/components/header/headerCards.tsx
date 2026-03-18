@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { HEADER_CARDS } from "./header.constants";
-import { UiCard, UiButton } from "../../webComponents";
+import { UiCard, UiButton } from "@asllyzuniga/react-library";
 import BudgetModalForm from "../budgetModalForm/budgetModalForm";
 
 export default function HeaderCards() {
