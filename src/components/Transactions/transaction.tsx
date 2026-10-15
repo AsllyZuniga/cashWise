@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { UiButton } from "@asllyzuniga/react-library";
 import TransactionForm from "./transactionForm";
-import "./Transaction.scss"; // Asegúrate de importar los estilos
+import "./transaction.scss";
 
 export default function Transaction() {
   const [isOpen, setIsOpen] = useState(false);

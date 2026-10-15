@@ -1,10 +1,10 @@
-import { useState } from "react";
-import "./monthselector.scss";
-import { MONTHS_OPTIONS } from "./monthSelector.constansts";
+import "./monthSelector.scss";
+import { MONTHS_OPTIONS } from "./monthSelector.constants";
 import { UiButton } from "@asllyzuniga/react-library";
+import { useFinance } from "../../context/financeContext";
 
 export default function MonthSelector() {
-  const [selectedMonth, setSelectedMonth] = useState("");
+  const { selectedMonth, setMonth } = useFinance();
 
   return (
     <div className="month-selector">
@@ -12,9 +12,9 @@ export default function MonthSelector() {
         <UiButton
           key={month.value}
           className={`month-selector__button ${
-            selectedMonth === month.value ? "active" : ""
+            selectedMonth === Number(month.value) ? "active" : ""
           }`}
-          onClick={() => setSelectedMonth(month.value)}
+          onClick={() => setMonth(Number(month.value))}
         >
           {month.label}
         </UiButton>

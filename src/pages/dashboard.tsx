@@ -1,6 +1,11 @@
+import { lazy, Suspense } from "react";
 import Header from "../components/header/header";
 import MonthSelector from "../components/monthSelector/monthSelector";
 import Transactions from "../components/Transactions/transaction";
+
+const FinanceChart = lazy(
+  () => import("../components/financeChart/financeChart")
+);
 
 const Dashboard = () => {
   return (
@@ -8,7 +13,9 @@ const Dashboard = () => {
       <Header />
       <MonthSelector />
       <Transactions />
-      <main></main>
+      <Suspense fallback={<p>Cargando gráfico...</p>}>
+        <FinanceChart />
+      </Suspense>
     </>
   );
 };

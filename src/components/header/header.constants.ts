@@ -1,25 +1,38 @@
-export const HEADER_CARDS = [
+import img1 from "../../assets/img/img1.png";
+import img2 from "../../assets/img/img2.png";
+import img3 from "../../assets/img/img3.png";
+
+export type HeaderCardId = "available" | "expenses" | "savings";
+
+export interface HeaderCardConfig {
+  id: HeaderCardId;
+  image: string;
+  title: string;
+}
+
+export const HEADER_CARDS: HeaderCardConfig[] = [
   {
-    image: "/src/assets/img/img1.png",
+    id: "available",
+    image: img1,
     title: "Puedes gastar",
-    value: "$0",
   },
   {
-    image: "/src/assets/img/img2.png",
+    id: "expenses",
+    image: img2,
     title: "Gasto total",
-    value: "$0",
   },
   {
-    image: "/src/assets/img/img3.png",
+    id: "savings",
+    image: img3,
     title: "Vas ahorrando",
-    value: "$0",
   },
 ];
 
-export const YEARS_OPTIONS = [
-  { id: "1", value: "2025", label: "2025" },
-  { id: "2", value: "2024", label: "2024" },
-  { id: "3", value: "2023", label: "2023" },
-  { id: "4", value: "2022", label: "2022" },
-  { id: "5", value: "2021", label: "2021" },
-];
+export const YEARS_OPTIONS = Array.from(
+  { length: 6 },
+  (_, index) => new Date().getFullYear() - index
+).map((year) => ({
+  id: String(year),
+  value: String(year),
+  label: String(year),
+}));

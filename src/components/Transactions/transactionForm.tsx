@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   UiPanelModal,
   UiInput,
@@ -6,14 +6,21 @@ import {
   UiSelect,
   UiTable,
 } from "@asllyzuniga/react-library";
-import "./Transaction.scss";
+import "./transaction.scss";
 import {
-  fetchTransactions,
   fetchSaveTransaction,
   fetchUpdateTransaction,
   fetchDeleteTransaction,
 } from "../../services/transactions.service";
 import { Transaction } from "../../models/transactions.interface";
+import {
+  MOVEMENTS,
+  METHODS,
+  RELATIONS,
+} from "../../models/transactions.constants";
+import { useFinance } from "../../context/financeContext";
+import { useToast } from "../../context/toastContext";
+import { getErrorMessage } from "../../config/axios";
 
 interface TransactionFormProps {
   externalOpen?: boolean;
@@ -21,7 +28,6 @@ interface TransactionFormProps {
 }
 
 interface FormState {
-  id?: string;
   concept: string;
   movement: string;
   amount: string;
@@ -30,12 +36,20 @@ interface FormState {
   date: string;
 }
 
-const MOVEMENTS = ["Pago", "Gasto", "Inversión", "Ingreso"];
-const METHODS = ["Efectivo", "Tarjeta de crédito", "Transferencia", "Otro"];
-const RELATIONS = ["Esenciales", "Bienestar", "Placer", "Aporte"];
+interface TableRow extends FormState {
+  id?: string;
+}
+
+const EMPTY_FORM: FormState = {
+  concept: "",
+  movement: "",
+  amount: "",
+  paymentMethod: "",
+  relation: "",
+  date: "",
+};
 
 const toFormState = (tx: Transaction): FormState => ({
-  id: tx.id,
   concept: tx.description || "",
   movement: String(tx.movement),
   amount: String(tx.value),
@@ -44,7 +58,7 @@ const toFormState = (tx: Transaction): FormState => ({
   date: tx.entryDate?.split("T")[0] || "",
 });
 
-const toTransaction = (form: FormState, includeId: boolean = false): Transaction => {
+const toTransaction = (form: FormState, id?: string): Transaction => {
   const tx: Transaction = {
     value: Number(form.amount),
     description: form.concept,
@@ -53,204 +67,201 @@ const toTransaction = (form: FormState, includeId: boolean = false): Transaction
     methodOfPayment: Number(form.paymentMethod),
     relation: Number(form.relation),
   };
-  if (includeId && form.id) tx.id = form.id;
+  if (id) tx.id = id;
   return tx;
 };
+
+const buildOptions = (labels: string[]) =>
+  labels.map((label, index) => ({
+    id: String(index + 1),
+    value: String(index + 1),
+    label,
+  }));
 
 export default function TransactionForm({
   externalOpen,
   onCloseExternal,
 }: TransactionFormProps) {
-  const [transactions, setTransactions] = useState<FormState[]>([]);
-  const [form, setForm] = useState<FormState>({
-    concept: "",
-    movement: "",
-    amount: "",
-    paymentMethod: "",
-    relation: "",
-    date: "",
-  });
-  const [loading, setLoading] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const { transactions, loading, error, refresh } = useFinance();
+  const { showToast, confirm } = useToast();
 
-  useEffect(() => {
-    loadTransactions();
-  }, []);
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (externalOpen) {
-      resetForm();
-      setEditIndex(null);
+      setForm(EMPTY_FORM);
+      setEditingId(null);
       setModalOpen(true);
     }
   }, [externalOpen]);
 
-  const loadTransactions = async () => {
-    setLoading(true);
-    try {
-      const now = new Date();
-      const data = await fetchTransactions(now.getMonth() + 1, now.getFullYear());
-      setTransactions(data.map(toFormState));
-    } catch (error) {
-      console.error("Error cargando transacciones:", error);
-      alert("Error al cargar las transacciones.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleEdit = useCallback(
+    (id: string) => {
+      const selected = transactions.find((tx) => tx.id === id);
+      if (!selected) return;
+
+      setForm(toFormState(selected));
+      setEditingId(id);
+      setModalOpen(true);
+    },
+    [transactions]
+  );
+
+  const handleDelete = useCallback(
+    async (id: string) => {
+      const selected = transactions.find((tx) => tx.id === id);
+      if (!selected) return;
+
+      const accepted = await confirm(
+        `¿Seguro que quieres eliminar "${selected.description}"?`
+      );
+      if (!accepted) return;
+
+      try {
+        await fetchDeleteTransaction(id);
+        await refresh();
+        showToast("Transacción eliminada exitosamente.", "success");
+      } catch (error) {
+        showToast(`No se pudo eliminar: ${getErrorMessage(error)}`, "error");
+      }
+    },
+    [transactions, confirm, refresh, showToast]
+  );
+
+  useEffect(() => {
+    const node = tableRef.current;
+    if (!node) return;
+
+    const onClick = (event: Event) => {
+      const target = event
+        .composedPath()
+        .find(
+          (element): element is HTMLElement =>
+            element instanceof HTMLElement &&
+            element.dataset?.action !== undefined
+        );
+      if (!target) return;
+
+      const { action, id } = target.dataset;
+      if (!id) return;
+
+      if (action === "edit") handleEdit(id);
+      if (action === "delete") void handleDelete(id);
+    };
+
+    node.addEventListener("click", onClick);
+    return () => node.removeEventListener("click", onClick);
+  }, [handleEdit, handleDelete]);
 
   const handleSave = async () => {
-    if (!form.concept || !form.amount || !form.paymentMethod || !form.movement || !form.date) {
-      alert("Por favor completa todos los campos requeridos.");
+    const required: (keyof FormState)[] = [
+      "concept",
+      "amount",
+      "paymentMethod",
+      "movement",
+      "date",
+    ];
+    const missing = required.find((field) => !form[field]);
+
+    if (missing) {
+      showToast("Por favor completa todos los campos requeridos.", "error");
       return;
     }
 
-    if (isNaN(Number(form.amount)) || Number(form.amount) <= 0) {
-      alert("El valor debe ser un número mayor a 0.");
+    if (!Number.isFinite(Number(form.amount)) || Number(form.amount) <= 0) {
+      showToast("El valor debe ser un número mayor a 0.", "error");
       return;
     }
 
+    setSaving(true);
     try {
-      if (editIndex !== null) {
-        const updatedTx = toTransaction(form, true);
-        const saved = await fetchUpdateTransaction(updatedTx);
-        setTransactions((prev) =>
-          prev.map((t, i) => (i === editIndex ? toFormState(saved) : t))
-        );
-        alert("Transacción actualizada exitosamente.");
+      if (editingId) {
+        await fetchUpdateTransaction(toTransaction(form, editingId));
+        showToast("Transacción actualizada exitosamente.", "success");
       } else {
-        const newTx = toTransaction(form, false);
-        const saved = await fetchSaveTransaction(newTx);
-        setTransactions((prev) => [...prev, toFormState(saved)]);
-        alert("Transacción creada exitosamente.");
+        await fetchSaveTransaction(toTransaction(form));
+        showToast("Transacción creada exitosamente.", "success");
       }
 
-      await loadTransactions();
-      resetForm();
-      setModalOpen(false);
-      onCloseExternal?.();
-    } catch (error: any) {
-      console.error("Error guardando transacción:", error);
-      alert(`Error al guardar la transacción: ${error.message}`);
-    }
-  };
-
-  const handleEdit = (index: number) => {
-    const selected = transactions[index];
-    if (!selected) return;
-
-    setForm({
-      id: selected.id,
-      concept: selected.concept || "",
-      movement: String(selected.movement),
-      amount: String(selected.amount),
-      paymentMethod: String(selected.paymentMethod),
-      relation: String(selected.relation),
-      date: selected.date || "",
-    });
-
-    setEditIndex(index);
-    setModalOpen(true);
-  };
-
-  const handleDelete = async (index: number) => {
-    const tx = transactions[index];
-    if (!tx?.id) {
-      alert("No se encontró el ID de la transacción.");
-      return;
-    }
-
-    if (confirm(`¿Seguro que quieres eliminar "${tx.concept}"?`)) {
-      try {
-        await fetchDeleteTransaction(tx.id);
-        setTransactions((prev) => prev.filter((_, i) => i !== index));
-        alert("Transacción eliminada exitosamente.");
-      } catch (error: any) {
-        alert(`No se pudo eliminar: ${error.message}`);
-      }
+      await refresh();
+      closeModal();
+    } catch (error) {
+      showToast(`Error al guardar: ${getErrorMessage(error)}`, "error");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleChange = (field: keyof FormState, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
-  const handleSelectChange = (field: keyof FormState) => (e: any) =>
-    handleChange(field, String(e.detail.value));
-
-  const handleInputChange = (field: keyof FormState) => (e: any) =>
-    handleChange(field, e.detail.value);
-
-  const resetForm = () => {
-    setForm({
-      concept: "",
-      movement: "",
-      amount: "",
-      paymentMethod: "",
-      relation: "",
-      date: "",
-    });
-    setEditIndex(null);
+  const closeModal = () => {
+    setForm(EMPTY_FORM);
+    setEditingId(null);
+    setModalOpen(false);
+    onCloseExternal?.();
   };
 
-  const tableData = transactions.map((tx, index) => ({
-    ...tx,
-    movement: MOVEMENTS[Number(tx.movement) - 1] || tx.movement,
-    paymentMethod: METHODS[Number(tx.paymentMethod) - 1] || tx.paymentMethod,
-    relation: RELATIONS[Number(tx.relation) - 1] || tx.relation,
-    _originalIndex: index,
+  const tableData: TableRow[] = transactions.map((tx) => ({
+    id: tx.id,
+    ...toFormState(tx),
   }));
+
+  const actionTemplate = (_value: unknown, row: TableRow) => {
+    if (!row.id) return "";
+
+    const base =
+      "border:none;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer;color:#fff;";
+
+    return `<div style="display:flex;gap:8px;justify-content:center;">
+      <button type="button" data-action="edit" data-id="${row.id}" style="${base}background:#2563eb;">Editar</button>
+      <button type="button" data-action="delete" data-id="${row.id}" style="${base}background:#dc2626;">Eliminar</button>
+    </div>`;
+  };
 
   return (
     <>
       <div className="transaction-manager space-y-6">
         <h2 className="text-xl font-bold">Movimientos</h2>
 
-        {loading ? (
-          <p>Cargando transacciones...</p>
-        ) : (
-          <UiTable
-            headers={[
-              { field: "concept", label: "Concepto" },
-              { field: "movement", label: "Movimiento" },
-              { field: "amount", label: "Valor" },
-              { field: "paymentMethod", label: "Método de Pago" },
-              { field: "relation", label: "Relación" },
-              { field: "date", label: "Fecha" },
-              { field: "actions", label: "Acciones" },
-            ]}
-            data={tableData}
-            templates={{
-              actions: (_value: unknown, row: any) => {
-                const container = document.createElement("div");
-                container.style.display = "flex";
-                container.style.gap = "8px";
-                container.style.justifyContent = "center";
-
-               
-                const editBtn = document.createElement("ui-button");
-                editBtn.textContent = "Editar"; 
-                editBtn.setAttribute("variant", "primary");
-                editBtn.onclick = () => handleEdit(row._originalIndex);
-          
-                const deleteBtn = document.createElement("ui-button");
-                deleteBtn.textContent = "Eliminar";
-                deleteBtn.setAttribute("variant", "danger");
-                deleteBtn.onclick = () => handleDelete(row._originalIndex);
-
-                container.appendChild(editBtn);
-                container.appendChild(deleteBtn);
-                return container;
-              },
-            }}
-          />
-        )}
+        <div ref={tableRef}>
+          {loading ? (
+            <p>Cargando transacciones...</p>
+          ) : error ? (
+            <p className="transaction-manager__error">
+              No se pudieron cargar las transacciones: {error}
+            </p>
+          ) : (
+            <UiTable
+              headers={[
+                { field: "concept", label: "Concepto" },
+                { field: "movement", label: "Movimiento" },
+                { field: "amount", label: "Valor" },
+                { field: "paymentMethod", label: "Método de Pago" },
+                { field: "relation", label: "Relación" },
+                { field: "date", label: "Fecha" },
+                { field: "actions", label: "Acciones" },
+              ]}
+              data={tableData.map((row) => ({
+                ...row,
+                movement: MOVEMENTS[Number(row.movement) - 1] || row.movement,
+                paymentMethod:
+                  METHODS[Number(row.paymentMethod) - 1] || row.paymentMethod,
+                relation: RELATIONS[Number(row.relation) - 1] || row.relation,
+              }))}
+              templates={{ actions: actionTemplate }}
+            />
+          )}
+        </div>
       </div>
 
-      {/* ✅ MODAL sin placeholders y con labels externos */}
       <UiPanelModal visible={modalOpen}>
         <div className="modal-header">
-          <h2>{editIndex !== null ? "Editar Transacción" : "Nueva Transacción"}</h2>
+          <h2>{editingId ? "Editar Transacción" : "Nueva Transacción"}</h2>
         </div>
 
         <div className="modal-body transaction-form">
@@ -258,10 +269,9 @@ export default function TransactionForm({
             <label htmlFor="concept">Concepto</label>
             <UiInput
               type="text"
-              name="concept"
               inputId="concept"
               value={form.concept}
-              onValueChange={handleInputChange("concept")}
+              onInputChange={(event) => handleChange("concept", event.detail)}
             />
           </div>
 
@@ -269,13 +279,11 @@ export default function TransactionForm({
             <label htmlFor="movement">Movimiento</label>
             <UiSelect
               name="movement"
-              options={MOVEMENTS.map((label, idx) => ({
-                id: String(idx + 1),
-                value: String(idx + 1),
-                label,
-              }))}
+              options={buildOptions(MOVEMENTS)}
               value={form.movement}
-              onValueChange={handleSelectChange("movement")}
+              onValueChange={(event) =>
+                handleChange("movement", String(event.detail.value))
+              }
             />
           </div>
 
@@ -283,10 +291,9 @@ export default function TransactionForm({
             <label htmlFor="amount">Valor</label>
             <UiInput
               type="number"
-              name="amount"
               inputId="amount"
               value={form.amount}
-              onValueChange={handleInputChange("amount")}
+              onInputChange={(event) => handleChange("amount", event.detail)}
             />
           </div>
 
@@ -294,13 +301,11 @@ export default function TransactionForm({
             <label htmlFor="paymentMethod">Método de Pago</label>
             <UiSelect
               name="paymentMethod"
-              options={METHODS.map((label, idx) => ({
-                id: String(idx + 1),
-                value: String(idx + 1),
-                label,
-              }))}
+              options={buildOptions(METHODS)}
               value={form.paymentMethod}
-              onValueChange={handleSelectChange("paymentMethod")}
+              onValueChange={(event) =>
+                handleChange("paymentMethod", String(event.detail.value))
+              }
             />
           </div>
 
@@ -308,13 +313,11 @@ export default function TransactionForm({
             <label htmlFor="relation">Relación</label>
             <UiSelect
               name="relation"
-              options={RELATIONS.map((label, idx) => ({
-                id: String(idx + 1),
-                value: String(idx + 1),
-                label,
-              }))}
+              options={buildOptions(RELATIONS)}
               value={form.relation}
-              onValueChange={handleSelectChange("relation")}
+              onValueChange={(event) =>
+                handleChange("relation", String(event.detail.value))
+              }
             />
           </div>
 
@@ -322,27 +325,19 @@ export default function TransactionForm({
             <label htmlFor="date">Fecha</label>
             <UiInput
               type="date"
-              name="date"
               inputId="date"
               value={form.date}
-              onValueChange={handleInputChange("date")}
+              onInputChange={(event) => handleChange("date", event.detail)}
             />
           </div>
         </div>
 
         <div className="modal-footer">
-          <UiButton
-            className="cancel"
-            onClick={() => {
-              resetForm();
-              setModalOpen(false);
-              onCloseExternal?.();
-            }}
-          >
+          <UiButton className="cancel" onClick={closeModal} disabled={saving}>
             Cancelar
           </UiButton>
-          <UiButton className="save" onClick={handleSave}>
-            {editIndex !== null ? "Actualizar" : "Guardar"}
+          <UiButton className="save" onClick={handleSave} disabled={saving}>
+            {saving ? "Guardando..." : editingId ? "Actualizar" : "Guardar"}
           </UiButton>
         </div>
       </UiPanelModal>

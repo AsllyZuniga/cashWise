@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { UiPanelModal, UiInput, UiButton } from "@asllyzuniga/react-library";
+import { useFinance } from "../../context/financeContext";
+import { useToast } from "../../context/toastContext";
 
 interface FormState {
   value: string;
   date: string;
 }
+
+const EMPTY_FORM: FormState = { value: "", date: "" };
 
 export default function BudgetModalForm({
   isOpen,
@@ -13,20 +17,25 @@ export default function BudgetModalForm({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  const [form, setForm] = useState<FormState>({
-    value: "",
-    date: "",
-  });
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const { setBudget } = useFinance();
+  const { showToast } = useToast();
 
   const handleChange = (field: keyof FormState, newValue: string) => {
-    setForm((prev) => ({
-      ...prev,
-      [field]: newValue,
-    }));
+    setForm((prev) => ({ ...prev, [field]: newValue }));
   };
 
   const handleSave = () => {
-    console.log("Presupuesto guardado:", form);
+    const value = Number(form.value);
+
+    if (!Number.isFinite(value) || value <= 0) {
+      showToast("El presupuesto debe ser un número mayor a 0.", "error");
+      return;
+    }
+
+    setBudget(value, form.date);
+    showToast("Presupuesto guardado exitosamente.", "success");
+    setForm(EMPTY_FORM);
     onClose();
   };
 
@@ -43,10 +52,9 @@ export default function BudgetModalForm({
           </label>
           <UiInput
             type="number"
-            name="value"
             inputId="value"
             value={form.value}
-            onValueChange={(e) => handleChange(e.detail.name, e.detail.value)}
+            onInputChange={(event) => handleChange("value", event.detail)}
           />
         </div>
 
@@ -56,10 +64,9 @@ export default function BudgetModalForm({
           </label>
           <UiInput
             type="date"
-            name="date"
             inputId="date"
             value={form.date}
-            onValueChange={(e) => handleChange(e.detail.name, e.detail.value)}
+            onInputChange={(event) => handleChange("date", event.detail)}
           />
         </div>
       </div>

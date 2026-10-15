@@ -4,11 +4,10 @@
 
 **Gestiona tus finanzas personales de forma simple y eficiente**
 
-[![React](https://img.shields.io/badge/React-18+-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Stencil](https://img.shields.io/badge/Web_Components-Stencil-000000?style=flat-square&logo=stencil&logoColor=white)](https://stenciljs.com/)
 [![SCSS](https://img.shields.io/badge/SCSS-styles-CC6699?style=flat-square&logo=sass&logoColor=white)](https://sass-lang.com/)
-![Commits](https://img.shields.io/badge/commits-23-blue?style=flat-square)
 
 </div>
 
@@ -25,9 +24,12 @@ Integra componentes UI reutilizables como **Web Components** (construidos con St
 ## ✨ Funcionalidades
 
 - 📅 **Selector de mes** — navega entre meses para ver tu historial financiero
+- 📆 **Selector de año** — filtra el resumen anual desde el header
 - 💼 **Presupuesto mensual** — define y guarda el presupuesto del mes mediante un modal
-- 💳 **Transacciones** — registra ingresos y gastos con fecha y valor
-- 🃏 **Header con tarjetas informativas** — resumen visual del estado financiero
+- 💳 **Transacciones** — registra, edita y elimina ingresos y gastos con fecha y valor
+- 🃏 **Header con tarjetas informativas** — resumen real de gasto, ahorro y disponible
+- 📊 **Gráfico anual** — totales por mes con Recharts
+- 🔔 **Notificaciones (toasts)** — feedback de éxito/error sin `alert()`
 
 ---
 
@@ -36,26 +38,50 @@ Integra componentes UI reutilizables como **Web Components** (construidos con St
 ```
 cashWise/
 ├── public/
+│   └── favicon.svg
 ├── src/
 │   ├── components/
 │   │   ├── header/
-│   │   │   ├── header.tsx              # Componente principal del header
+│   │   │   ├── header.tsx
 │   │   │   ├── header.scss
-│   │   │   ├── header.constants.ts     # Constantes del header
-│   │   │   └── headerCards.tsx         # Tarjetas de resumen financiero
+│   │   │   ├── header.constants.ts
+│   │   │   └── headerCards.tsx
 │   │   ├── budgetModalForm/
-│   │   │   └── budgetModalForm.tsx     # Modal para agregar presupuesto
+│   │   │   └── budgetModalForm.tsx
+│   │   ├── financeChart/
+│   │   │   ├── financeChart.tsx
+│   │   │   └── financeChart.scss
 │   │   ├── monthSelector/
-│   │   │   ├── monthSelector.tsx       # Selector de mes
+│   │   │   ├── monthSelector.tsx
 │   │   │   ├── monthSelector.scss
-│   │   │   └── monthSelector.constansts.ts
+│   │   │   └── monthSelector.constants.ts
 │   │   └── Transactions/
-│   │       ├── transaction.tsx         # Componente de transacciones
-│   │       ├── transactionForm.tsx     # Formulario de nueva transacción
+│   │       ├── transaction.tsx
+│   │       ├── transactionForm.tsx
 │   │       └── transaction.scss
+│   ├── config/
+│   │   └── axios.ts
+│   ├── context/
+│   │   ├── FinanceContext.tsx
+│   │   ├── ToastContext.tsx
+│   │   └── toast.scss
+│   ├── models/
+│   │   ├── transactions.interface.ts
+│   │   ├── transactions.constants.ts
+│   │   └── graph.interface.ts
+│   ├── services/
+│   │   ├── transactions.service.ts
+│   │   └── budget.service.ts
+│   ├── utils/
+│   │   └── currency.ts
+│   ├── pages/
+│   │   └── dashboard.tsx
+│   └── test/
+│       └── setup.ts
+├── .env.example
 ├── index.html
 ├── package.json
-├── tsconfig.json
+├── vite.config.ts
 └── eslint.config.js
 ```
 
@@ -72,7 +98,8 @@ const Dashboard = () => {
     <>
       <Header />
       <MonthSelector />
-      <main></main>
+      <Transactions />
+      <FinanceChart />
     </>
   );
 };
@@ -80,34 +107,48 @@ const Dashboard = () => {
 
 ---
 
-### `BudgetModalForm`
-Modal para registrar el presupuesto mensual. Usa Web Components (`UiPanelModal`, `UiInput`, `UiButton`) y manejo de estado con `useState`:
+### `FinanceContext`
+Estado compartido de la app: mes/año seleccionados, transacciones y totales calculados (ingreso, gasto, ahorro, disponible). Evita que cada componente haga su propio fetch y mantiene el selector de mes/año sincronizado con los datos.
 
 ```tsx
-const [form, setForm] = useState<FormState>({ value: "", date: "" });
-
-const handleChange = (field: keyof FormState, newValue: string) => {
-  setForm((prev) => ({ ...prev, [field]: newValue }));
-};
-```
-
-```tsx
-<UiPanelModal visible={isOpen}>
-  <UiInput type="number" name="value" value={form.value}
-    onValueChange={(e) => handleChange(e.detail.name, e.detail.value)} />
-  <UiInput type="date" name="date" value={form.date}
-    onValueChange={(e) => handleChange(e.detail.name, e.detail.value)} />
-  <UiButton onClick={handleSave}>Guardar</UiButton>
-</UiPanelModal>
+const { selectedMonth, selectedYear, setMonth, setYear, totals } = useFinance();
 ```
 
 ---
 
+### `ToastContext`
+Reemplaza `alert()`/`confirm()` por notificaciones no bloqueantes y un modal de confirmación:
+
+```tsx
+const { showToast, confirm } = useToast();
+
+showToast("Transacción creada exitosamente.", "success");
+const accepted = await confirm("¿Seguro que quieres eliminar?");
+```
+
+---
+
+### `BudgetModalForm`
+Modal para registrar el presupuesto mensual. Usa Web Components (`UiPanelModal`, `UiInput`, `UiButton`) y persiste mediante `budget.service`:
+
+```tsx
+<UiInput
+  type="number"
+  name="value"
+  value={form.value}
+  onInputChange={(e) => handleChange("value", e.detail)}
+/>
+```
+
+> Nota: `UiInput` emite `inputChange` (`onInputChange`), mientras que `UiSelect` emite `valueChange` (`onValueChange`).
+
+---
+
 ### `MonthSelector`
-Selector de mes extraído del header como componente independiente, con sus propias constantes y estilos SCSS.
+Selector de mes conectado al `FinanceContext` (el mes activo filtra las transacciones y el resumen).
 
 ### `Transactions`
-Gestión de transacciones con formulario modal para añadir nuevos registros y vista de historial.
+Gestión de transacciones con formulario modal, edición y borrado por `id`.
 
 ---
 
@@ -117,9 +158,24 @@ cashWise consume componentes del design system propio vía Web Components:
 
 | Componente | Uso en la app |
 |------------|---------------|
-| `<UiPanelModal>` | Modal de presupuesto y transacciones |
-| `<UiInput>` | Campos de valor y fecha en formularios |
+| `<UiPanelModal>` | Modal de presupuesto, transacciones y confirmación |
+| `<UiInput>` | Campos de texto, número y fecha |
+| `<UiSelect>` | Selectores de movimiento, método de pago y relación |
+| `<UiTable>` | Historial de transacciones |
 | `<UiButton>` | Botones de acción (Guardar / Cancelar) |
+| `<UiCard>` | Tarjetas del header |
+
+---
+
+## ⚙️ Variables de entorno
+
+Copia `.env.example` a `.env` y ajusta la URL de la API:
+
+```bash
+VITE_API_URL=https://localhost:7050/api
+```
+
+> `.env` está ignorado por git. Mantén `.env.example` actualizado.
 
 ---
 
@@ -141,14 +197,28 @@ npm run dev
 
 ---
 
+## 🧪 Scripts
+
+| Comando | Descripción |
+|---------|-------------|
+| `npm run dev` | Servidor de desarrollo |
+| `npm run build` | Compila TypeScript y genera el build de producción |
+| `npm run preview` | Previsualiza el build de producción |
+| `npm run lint` | Ejecuta ESLint |
+| `npm test` | Ejecuta los tests con Vitest |
+
+---
+
 ## 🛠️ Stack Tecnológico
 
 | Tecnología | Rol |
 |------------|-----|
-| **React 18+** | Framework principal de UI |
+| **React 19** | Framework principal de UI |
 | **TypeScript** | Tipado estático |
 | **SCSS** | Estilos por componente |
 | **Stencil Web Components** | Sistema de diseño reutilizable |
+| **Recharts** | Gráfico de totales anuales |
+| **Vitest** | Testing unitario |
 | **ESLint** | Calidad y estilo del código |
 | **Vite** | Bundler y servidor de desarrollo |
 
